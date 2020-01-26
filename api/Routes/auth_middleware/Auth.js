@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken')
-const { jwtSecret } = require('../../../config')
 
 module.exports = function(req, res, next) {
 
@@ -11,7 +10,7 @@ module.exports = function(req, res, next) {
 
     try {
 
-    let decodedToken = jwt.verify(token, jwtSecret)
+    let decodedToken = jwt.verify(token, process.env.jwtSecret)
 
     req.user = decodedToken.user
 
