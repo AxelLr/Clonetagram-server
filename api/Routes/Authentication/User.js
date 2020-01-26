@@ -1,10 +1,10 @@
+require('dotenv').config()
 const express = require('express')
 const router = express.Router()
 const {check, validationResult } = require('express-validator')
 const User = require('../../../models/User')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
-const { jwtSecret } = require('../../../config')
 
 // REGISTER USER
 router.post('/register', [
@@ -58,7 +58,7 @@ router.post('/register', [
             }
         }
 
-        jwt.sign(payload, jwtSecret, { expiresIn: 360000}, (err, token) => {
+        jwt.sign(payload, procces.env.jwtSecret, { expiresIn: 360000}, (err, token) => {
             
         if(err) throw err
 
@@ -104,7 +104,7 @@ router.post('/login', [
             }
         }
 
-        jwt.sign(payload, jwtSecret, { expiresIn: 360000}, (err, token) => {
+        jwt.sign(payload, procces.env.jwtSecret, { expiresIn: 360000}, (err, token) => {
             
         if(err) throw err
 
