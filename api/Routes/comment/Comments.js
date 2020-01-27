@@ -16,20 +16,19 @@ router.post('/:id', Auth, async (req, res) => {
     try {
 
         user = await User.findById(req.user.id)
-        post = await Post.findById(id)
+        post = await Post.findByIdAndUpdate(id, { $inc: {'commentCount' : 1}})
 
         if(!post) return res.status(400).json('El post no existe')
         
         const newComment = new Comment ({
             content,
             user_id: req.user.id,
-            username: user.username,
             post_id: id
         }) 
 
         await newComment.save()
 
-        res.json(newComment)
+        res.json('exit')
         
     } catch (err) {
         console.log(err)
@@ -41,9 +40,12 @@ router.post('/:id', Auth, async (req, res) => {
 router.delete('/:id/delete', Auth, async (req, res) => {
 
     const { id } = req.params
-    const comment = await Comment.findById(id)
 
     try {
+
+    const comment = await Comment.findById(id)
+
+    await Post.findByIdAndUpdate(comment.post_id, { $inc: {'commentCount' : -1}})
         
     if(req.user.id !== comment.user_id.toString()) return res.status(401).json('No tienes autorización para hacer eso')
     if(!comment) return res.status(400).json('El comentario no existe')
@@ -65,7 +67,7 @@ router.get('/:id', async ( req, res ) => {
     const { id } = req.params
     
     try {
-        const comments = await Comment.find({post_id: id}).sort({date: -1})
+        const comments = await Comment.find({post_id: id}).populate('user_id', ['username', 'profileImg']).sort({date: -1})
         const post = await Post.findById(id)
         
         if(!post) return res.status(401).json('El post no existe')

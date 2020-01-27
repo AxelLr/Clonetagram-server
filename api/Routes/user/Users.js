@@ -10,47 +10,12 @@ const {check, validationResult } = require('express-validator')
 // GET LOGGED IN USER DATA 
 router.get('/me', Auth, async (req, res) => {
 
-    const { id } = req.user.id
-    let userData = {}
-
     try {
-        const user = await User.findById(id)
-        const posts = await Post.find({user_id: id}).sort({date: -1 })
-
+        const user = await User.findById(req.user.id)
+     
         if(!user) {
             return res.status(401).json( {error: 'El usuario no existe '} )
         }
-
-        userData.user = user
-        if(posts) userData.posts = [ posts ]
-
-
-        res.json(userData)
-        
-    } catch (err) {
-        console.log(err)
-        return res.status(500).send('Server error')
-    }
-})
-
-// CHANGE PROFILE IMAGE 
-router.put('/me', Auth, async (req, res) => {
-
-    try {
-        const result = await cloudinary.v2.uploader.upload(req.file.path)
-        const user = await User.findById(req.user.id)
-
-        if(user.profileImg.url !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1578947999/noprofileimg2_uy01qe.png') {
-            await cloudinary.v2.uploader.destroy(user.profileImg.public_id)
-        }
-
-        if(!user) return res.status(400).json('El usuario no existe')
-
-        user.profileImg.url = result.url
-        user.profileImg.public_id = result.public_id
-
-        await user.save()
-        await fs.unlink(req.file.path)
 
         res.json(user)
         
@@ -60,9 +25,36 @@ router.put('/me', Auth, async (req, res) => {
     }
 })
 
+// CHANGE PROFILE IMAGE 
+router.put('/image', Auth, async (req, res) => {
+
+    try {
+        const result = await cloudinary.v2.uploader.upload(req.file.path)
+        const user = await User.findById(req.user.id)
+
+        if(user.profileImg !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1578947999/noprofileimg2_uy01qe.png') {
+            await cloudinary.v2.uploader.destroy(user.public_id)
+        }
+
+        if(!user) return res.status(400).json('El usuario no existe')
+
+        user.profileImg = result.url
+        user.public_id = result.public_id
+
+        await user.save()
+        await fs.unlink(req.file.path)
+
+        res.json('exit')
+        
+    } catch (err) {
+        console.log(err)
+        return res.status(500).send('Server error')
+    }
+})
+
 // ADD USER DESCRIPTION 
 router.post('/me/details', Auth, [
-    check('conent','Excedido el límite de caracteres').isLength({max: 200})
+    check('details','Excedido el límite de caracteres').isLength({max: 200})
 ], async (req, res) => {
 
     const errors = validationResult(req)
@@ -71,14 +63,14 @@ router.post('/me/details', Auth, [
         return res.status(400).json( { errors: errors.array() } )
     }
 
-    if(req.body.content.trim() === '') return res.status(400).json('No debe estar vacío')
+    if(req.body.details.trim() === '') return res.status(400).json('No debe estar vacío')
 
     try {
         const user = await User.findById(req.user.id)
 
         if(!user) return res.status(400).json('El usuario no existe')
 
-        user.description = req.body.content
+        user.description = req.body.details
 
         await user.save()
         res.send(user)
@@ -94,8 +86,6 @@ router.get('/:id', async (req, res) => {
 
 const { id } = req.params
 
-let UserData = {};
-
     try {
 
     const user = await User.findById(id)
@@ -105,10 +95,7 @@ let UserData = {};
         return res.status(401).json('El usuario no existe')
     }
 
-    userData.user = user
-    if(posts) userData.posts = [ posts ]
-
-    res.json(userData)
+    res.json(user)
 
     } catch (err) {
         console.log(err)

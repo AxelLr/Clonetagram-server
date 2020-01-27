@@ -5,10 +5,6 @@ const PostSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    title: {
-        type: String,
-        required: true
-    },
     imageURL: {
         type: String,
         required: true
@@ -19,7 +15,7 @@ const PostSchema = new mongoose.Schema({
     username: {
         type: String
     },
-    user_id: {
+    userRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user'
     },
@@ -37,7 +33,11 @@ const PostSchema = new mongoose.Schema({
                 ref: 'user'
             }
         }
-    ]
+    ],
+    commentCount: {
+        type: Number,
+        default: 0
+    } 
 })
 
 module.exports = Post = mongoose.model('post', PostSchema)

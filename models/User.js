@@ -17,14 +17,12 @@ const UserSchema = new mongoose.Schema({
     description: {
         type: String
     }, 
-    profileImg:{
-        url: {
-            type: String,
-            default: 'https://res.cloudinary.com/dtyljkszk/image/upload/v1578947999/noprofileimg2_uy01qe.png'
+    profileImg: {
+        type: String,
+        default: 'https://res.cloudinary.com/dtyljkszk/image/upload/v1578947999/noprofileimg2_uy01qe.png'
         },
-        public_id: {
-            type: String
-        }
+    public_id: {
+        type: String
     },
     date: {
         type: Date,

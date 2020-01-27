@@ -6,9 +6,6 @@ const multer = require('multer')
 const path = require('path')
 const uuid = require('uuid/v4')
 
-
-// TO DO AGREGAR GET POSTS FROM SUBSCRIPTIONS 
-
 // PUERTO
 const PORT = process.env.PORT || 5000
 

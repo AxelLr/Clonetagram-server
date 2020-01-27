@@ -12,7 +12,7 @@ const fs = require('fs-extra')
 router.get('/', async (req, res) => {
 
     try {
-        const posts = await Post.find().sort({ date: -1 })
+        const posts = await Post.find().sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
 
         res.json(posts)
 
@@ -22,43 +22,43 @@ router.get('/', async (req, res) => {
     }
 })
 
+// GET ALL POSTS FROM USER
+router.get('/users/:id', Auth, async (req, res) => {
+
+    try {
+
+        const posts = await Post.find({'userRef': req.params.id}).populate('userRef', ['profileImg', 'username'])
+
+        res.json(posts)
+        
+    } catch (err) {
+        console.error(err.message)
+        return res.status(500).send('Server error')
+    }
+})
+
 // NEW POST
 router.post('/add', Auth, [
-    check('title', 'el número máximo de caracteres permitido es 15').isLength({ max: 15 }),
     check('description', 'el número máximo de caracteres permitido es 200').isLength({max: 200 })
-
 ], async (req, res) => {
 
 const errors = validationResult(req)
 
-const { title, description } = req.body
+const { description } = req.body
 
 if(!errors.isEmpty()) {
     return res.status(400).json( { errors: errors.array() } )
 }
 
-if(title.trim() === '' ) {
-    return res.status(400).json({ errors: [{msg: 'No debe estar vacío', param: 'title' }]})
-}
-
 try{
     const result = await cloudinary.v2.uploader.upload(req.file.path)
-
-    const user = await User.findById(req.user.id).select(['username','profileImg'])
     
-    console.log(result)
-
     let post = {
-        user_id: req.user.id,
+        userRef: req.user.id,
         public_id: result.public_id,
-        title,
-        imageURL: result.url,
-        username: user.username,
-        avatar: user.profileImg
+        imageURL: result.url
     }
 
-    console.log(post)
-   
     if(description) post.description = description
 
     let newPost = new Post(post)
@@ -66,10 +66,13 @@ try{
     await newPost.save()
     await fs.unlink(req.file.path)
 
-    res.send('exit')  
+    post = await Post.findById(newPost._id).populate('userRef', ['username','profileImg'])
+
+    res.json(post)  
 }
-    catch(errors) {
-        console.log(errors.message)
+    catch(err) {
+        console.log(err)
+        return res.status(500).json('Server error')
     }
 
 })
@@ -79,15 +82,12 @@ router.delete('/:id/delete', Auth,  async (req, res) => {
 
     const { id } = req.params
     const post = await Post.findById(id)
-    console.log(req.user.id + 'connected user')
-
-    console.log(post.user_id )
 
     if(!post) {
         return res.status(400).json('El post no existe.')
     }
 
-    if(post.user_id.toString() !== req.user.id) {
+    if(post.userRef._id.toString() !== req.user.id) {
         return res.status(401).json('No tienes autorización para hacer eso.')
     }
 
@@ -104,20 +104,16 @@ router.delete('/:id/delete', Auth,  async (req, res) => {
 })
 
 // GET SINGLE POST
-router.get('/:id', async (req, res) => {
+router.get('/post/:id', async (req, res) => {
 
 const { id } = req.params
-let postData = {}
 
 try {
-    const post = await Post.findById(id)
-    const comments = await Comment.find({post_id: id})
+    const post = await Post.findById(id).populate('userRef', ['username','profileImg'])
 
     if(!post) {
         return res.status(400).json('El post no existe')
     }
-
-    if(comments) postData.Comments = [ comments ]
 
     res.json(post)
     
@@ -191,6 +187,28 @@ router.delete('/:postid/dislike', Auth, async (req, res) => {
 })
 
 // GET POSTS FROM SUBSCRIPTIONS 
+router.get('/user/subscriptions', Auth, async (req, res) => {
 
+    try {
+      
+        let subscriptions = [req.user.id]
+        
+        const posts = await Post.find().populate('userRef', ['profileImg', 'username'])
+        const user =  await User.findById(req.user.id)
+
+        user.subscriptions.forEach( subscription => subscriptions.push(subscription.user_id.toString()))
+
+        let subscriptionsPosts = posts.filter(post => subscriptions.includes(post.userRef._id.toString()) === true)
+
+        let finalPosts = subscriptionsPosts.map(post => post.populate('userRef', ['profileImg', 'username']))
+    
+        res.json(finalPosts)
+        
+    } catch (err) {
+        console.log(err)
+        return res.status(500).json('Server error')        
+    }
+
+})
 
 module.exports = router
