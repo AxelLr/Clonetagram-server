@@ -4,7 +4,6 @@ const {check, validationResult } = require('express-validator')
 const Auth = require('../auth_middleware/Auth')
 const Post = require('../../../models/Post')
 const User = require('../../../models/User')
-const Comment = require('../../../models/Comment')
 const cloudinary = require('../../../Cloudinary')
 const fs = require('fs-extra')
 
@@ -12,9 +11,14 @@ const fs = require('fs-extra')
 router.get('/', async (req, res) => {
 
     try {
-        const posts = await Post.find().sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
+         let allPosts = {}
+         const postsNumber = req.query.postsNumber ? parseInt(req.query.postsNumber) : 8
+         const page = req.query.page ? parseInt(req.query.page) : 1 
+         allPosts = await Post.find().skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
+       
+         allPosts.numberOfPosts = await Post.countDocuments()
 
-        res.json(posts)
+        res.json(allPosts)
 
     } catch(err) {
         console.error(err.message)
@@ -190,19 +194,15 @@ router.delete('/:postid/dislike', Auth, async (req, res) => {
 router.get('/user/subscriptions', Auth, async (req, res) => {
 
     try {
-      
+
         let subscriptions = [req.user.id]
-        
-        const posts = await Post.find().populate('userRef', ['profileImg', 'username'])
-        const user =  await User.findById(req.user.id)
-
+        const user =  await User.findById(req.user.id).select('subscriptions')
         user.subscriptions.forEach( subscription => subscriptions.push(subscription.user_id.toString()))
+        const posts = await Post.find({'userRef': {$in: subscriptions }} ).populate('userRef', ['profileImg', 'username']).sort({ date: -1 })
 
-        let subscriptionsPosts = posts.filter(post => subscriptions.includes(post.userRef._id.toString()) === true)
+        res.json(posts)
+        console.log(user)
 
-        let finalPosts = subscriptionsPosts.map(post => post.populate('userRef', ['profileImg', 'username']))
-    
-        res.json(finalPosts)
         
     } catch (err) {
         console.log(err)

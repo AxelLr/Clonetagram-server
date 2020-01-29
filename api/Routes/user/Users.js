@@ -44,7 +44,7 @@ router.put('/image', Auth, async (req, res) => {
         await user.save()
         await fs.unlink(req.file.path)
 
-        res.json('exit')
+        res.json(user)
         
     } catch (err) {
         console.log(err)
@@ -59,13 +59,15 @@ router.post('/me/details', Auth, [
 
     const errors = validationResult(req)
 
-    if(!errors.isEmpty()) {
-        return res.status(400).json( { errors: errors.array() } )
-    }
-
-    if(req.body.details.trim() === '') return res.status(400).json('No debe estar vacío')
 
     try {
+        
+        if(!errors.isEmpty()) {
+            return res.status(400).json( { errors: errors.array() } )
+        }
+
+        if(req.body.details.trim() === '') return res.status(400).json('No debe estar vacío')
+
         const user = await User.findById(req.user.id)
 
         if(!user) return res.status(400).json('El usuario no existe')
@@ -73,7 +75,7 @@ router.post('/me/details', Auth, [
         user.description = req.body.details
 
         await user.save()
-        res.send(user)
+        res.json(user)
         
     } catch (err) {
         console.log(err)
@@ -137,7 +139,7 @@ try {
     follower.subscriptions.push(newSubscription)
     await follower.save()
 
-    res.send(follower)
+    res.send(followed)
 
 } catch (err) {
     console.log(err)
@@ -172,13 +174,49 @@ router.delete('/unsubscribe/:id', Auth, async (req, res) => {
         follower.subscriptions = newSubscriptionList
         await follower.save()
     
-        res.send(follower)
+        res.send(followed)
     
     } catch (err) {
         console.log(err)
         return res.status(500).send('Server error')    
     }
 })
+
+// GET USERS
+router.get('/', async (req, res) =>{
+
+try {
+    if(req.query.search) {
+
+    const regex = new RegExp(escapeRegex(req.query.search), 'gi')
+
+    const user = await User.find({'username': regex })
+
+    if(!user) res.send(undefined)
+    console.log(user)
+    res.json(user)
+    
+    console.log(user)
+    } else {
+
+    const users = await User.find().limit(8)
+
+    if(users) res.json(users)
+
+    }    
+   
+} catch (err) {
+    console.log(err)
+    return res.status(500).send('Server error')    
+}
+
+})
+
+// HELPERS
+function escapeRegex(text) {
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+};
+
 
 // // DELETE ACCOUNT 
 // router.delete('/me/delete', Auth, async (req, res) => {

@@ -11,12 +11,11 @@ router.post('/:id', Auth, async (req, res) => {
     const { content } = req.body
     const { id } = req.params
 
-    if(content.trim() === '') return res.status(400).json('No debe estar vacío')
-
     try {
+   
+        if(content.trim() === '') return res.status(400).json('No debe estar vacío')
 
-        user = await User.findById(req.user.id)
-        post = await Post.findByIdAndUpdate(id, { $inc: {'commentCount' : 1}})
+        let post = await Post.findByIdAndUpdate(id, { $inc: {'commentCount' : 1}})
 
         if(!post) return res.status(400).json('El post no existe')
         
@@ -28,7 +27,9 @@ router.post('/:id', Auth, async (req, res) => {
 
         await newComment.save()
 
-        res.json('exit')
+        let comments = await Comment.find({'post_id': id }).populate('user_id', ['username', 'profileImg']).sort({date: -1})
+
+        res.json(comments)
         
     } catch (err) {
         console.log(err)
@@ -90,13 +91,12 @@ router.post('/:id/reply', Auth, async (req, res) => {
 
     try {
 
-       const comment = await Comment.findById(id)
+       const comment = await Comment.findById(id).populate('user_id', ['username', 'profileImg'])
        const user = await User.findById(req.user.id)
         
        if(!comment) return res.status(401).json('El comentario no existe')
        
-
-       newComment = {
+      let newComment = {
           username: user.username,
           content,
           user_id: req.user.id
