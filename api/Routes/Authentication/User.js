@@ -39,7 +39,6 @@ router.post('/register', [
             return res.status(400).json({ msg: 'Lo sentimos, El nombre ya ha sido tomado' })
         }
  
-
         user = new User ({
             username,
             email,

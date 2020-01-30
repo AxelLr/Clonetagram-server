@@ -14,11 +14,12 @@ router.get('/', async (req, res) => {
          let allPosts = {}
          const postsNumber = req.query.postsNumber ? parseInt(req.query.postsNumber) : 8
          const page = req.query.page ? parseInt(req.query.page) : 1 
-         allPosts = await Post.find().skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
+         allPosts.posts = await Post.find().skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
        
          allPosts.numberOfPosts = await Post.countDocuments()
-
+    
         res.json(allPosts)
+        console.log(allPosts)
 
     } catch(err) {
         console.error(err.message)
@@ -56,11 +57,13 @@ if(!errors.isEmpty()) {
 
 try{
     const result = await cloudinary.v2.uploader.upload(req.file.path)
+
+    console.log(result)
     
     let post = {
         userRef: req.user.id,
         public_id: result.public_id,
-        imageURL: result.url
+        imageURL: result.secure_url
     }
 
     if(description) post.description = description

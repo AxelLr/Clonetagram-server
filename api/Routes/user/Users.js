@@ -38,7 +38,7 @@ router.put('/image', Auth, async (req, res) => {
 
         if(!user) return res.status(400).json('El usuario no existe')
 
-        user.profileImg = result.url
+        user.profileImg = result.secure_url
         user.public_id = result.public_id
 
         await user.save()
