@@ -34,7 +34,9 @@ app.use(multer({
         if( mimetype && extname) {
             return cb(null, true)
         }
-        cb('Error: El archivo debe ser una imágen válida')
+        req.validationErrors = 'El Archivo debe ser una imágen válida.'
+        return cb(null, false, req.fileValidationError)
+
     }
 }).single('image'))
 

@@ -47,15 +47,19 @@ router.post('/add', Auth, [
     check('description', 'el número máximo de caracteres permitido es 200').isLength({max: 200 })
 ], async (req, res) => {
 
-const errors = validationResult(req)
-
-const { description } = req.body
-
-if(!errors.isEmpty()) {
-    return res.status(400).json( { errors: errors.array() } )
-}
-
 try{
+
+    if(req.validationErrors) return res.status(400).json(req.validationErrors) 
+    
+    console.log(req.validationErrors)
+
+    const errors = validationResult(req)
+
+    const { description } = req.body
+
+    if(!errors.isEmpty()) {
+        return res.status(400).json( { errors: errors.array() } )
+    } 
     const result = await cloudinary.v2.uploader.upload(req.file.path)
 
     console.log(result)
