@@ -32,7 +32,7 @@ router.put('/image', Auth, async (req, res) => {
         const result = await cloudinary.v2.uploader.upload(req.file.path)
         const user = await User.findById(req.user.id)
 
-        if(user.profileImg !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1578947999/noprofileimg2_uy01qe.png') {
+        if(user.profileImg !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1580349494/noprofileimg2_d40pl3.png') {
             await cloudinary.v2.uploader.destroy(user.public_id)
         }
 
