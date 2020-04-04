@@ -1,11 +1,16 @@
 const express = require('express')
 const router = express.Router()
-const {check, validationResult } = require('express-validator')
+const { check, validationResult } = require('express-validator')
 const Auth = require('../auth_middleware/Auth')
 const Post = require('../../../models/Post')
 const User = require('../../../models/User')
-const cloudinary = require('../../../Cloudinary')
+const cloudinary = require('../../../config/CloudinaryConfig')
 const fs = require('fs-extra')
+
+function unAuthorized(user, userRequesting) {
+    let unauthorized = user._id == userRequesting || !user.private ? false : user.private && !user.followers.some(foll => foll.user_id == userRequesting) && true
+    return { unauthorized }
+}
 
 // GET ALL POSTS 
 router.get('/', async (req, res) => {
@@ -14,12 +19,12 @@ router.get('/', async (req, res) => {
          let allPosts = {}
          const postsNumber = req.query.postsNumber ? parseInt(req.query.postsNumber) : 8
          const page = req.query.page ? parseInt(req.query.page) : 1 
-         allPosts.posts = await Post.find().skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username'])
-       
-         allPosts.numberOfPosts = await Post.countDocuments()
-    
+         let response = await Post.find().skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username', 'private'])
+         
+         allPosts.posts = response.filter(post => !post.userRef.private )
+        //  allPosts.numberOfPosts = await Post.countDocuments()
+        allPosts.numberOfPosts = allPosts.posts.length 
         res.json(allPosts)
-        console.log(allPosts)
 
     } catch(err) {
         console.error(err.message)
@@ -31,10 +36,14 @@ router.get('/', async (req, res) => {
 router.get('/users/:id', Auth, async (req, res) => {
 
     try {
-
+        const user = await User.findById(req.params.id)
         const posts = await Post.find({'userRef': req.params.id}).populate('userRef', ['profileImg', 'username'])
+        
+        let { unauthorized } = unAuthorized(user, req.user.id) 
 
-        res.json(posts)
+        if(unauthorized) { return res.status(401).send('No tienes autorizacion para ver este contenido') } else {
+            return res.json(posts)
+        }     
         
     } catch (err) {
         console.error(err.message)
@@ -44,15 +53,13 @@ router.get('/users/:id', Auth, async (req, res) => {
 
 // NEW POST
 router.post('/add', Auth, [
-    check('description', 'el número máximo de caracteres permitido es 200').isLength({max: 200 })
+    check('description', 'el número máximo de caracteres permitido es 200').isLength({ max: 200 })
 ], async (req, res) => {
 
 try{
 
     if(req.validationErrors) return res.status(400).json(req.validationErrors) 
     
-    console.log(req.validationErrors)
-
     const errors = validationResult(req)
 
     const { description } = req.body
@@ -61,8 +68,6 @@ try{
         return res.status(400).json( { errors: errors.array() } )
     } 
     const result = await cloudinary.v2.uploader.upload(req.file.path)
-
-    console.log(result)
     
     let post = {
         userRef: req.user.id,
@@ -115,19 +120,20 @@ router.delete('/:id/delete', Auth,  async (req, res) => {
 })
 
 // GET SINGLE POST
-router.get('/post/:id', async (req, res) => {
-
-const { id } = req.params
+router.get('/post/:id', Auth, async (req, res) => {
 
 try {
-    const post = await Post.findById(id).populate('userRef', ['username','profileImg'])
-
-    if(!post) {
-        return res.status(400).json('El post no existe')
-    }
-
-    res.json(post)
+    const post = await Post.findById(req.params.id).populate('userRef', ['username','profileImg'])
+    const user = await User.findById(post.userRef._id)
     
+    if(!post) return res.status(400).json('El post no existe')
+    
+    let { unauthorized } = unAuthorized(user, req.user.id) 
+
+    if(unauthorized) { return res.status(401).send('No tienes autorizacion para ver este contenido') } else {
+        return res.json(post)
+    }     
+
 } catch(err) {
     console.error(err.message)
     if (err.kind == 'ObjectId') {
@@ -139,12 +145,10 @@ try {
 
 // LIKE A POST
 router.post('/:postid/like', Auth, async (req, res) => {
-
-    const { postid } = req.params
     
     try {
 
-        const post = await Post.findById(postid)
+        const post = await Post.findById( req.params.postid)
         const like = post.likes.filter(like => like.user.toString() === req.user.id)
 
         if(!post) return res.status(401).json('El post no existe')
@@ -202,14 +206,15 @@ router.get('/user/subscriptions', Auth, async (req, res) => {
 
     try {
 
+        const postsNumber = req.query.postsNumber ? parseInt(req.query.postsNumber) : 4
+        const page = req.query.page ? parseInt(req.query.page) : 1 
+
         let subscriptions = [req.user.id]
         const user =  await User.findById(req.user.id).select('subscriptions')
         user.subscriptions.forEach( subscription => subscriptions.push(subscription.user_id.toString()))
-        const posts = await Post.find({'userRef': {$in: subscriptions }} ).populate('userRef', ['profileImg', 'username']).sort({ date: -1 })
+        const posts = await Post.find({'userRef': {$in: subscriptions }} ).skip((page - 1) * postsNumber).limit(postsNumber).sort({ date: -1 }).populate('userRef', ['profileImg', 'username']).sort({ date: -1 })
 
         res.json(posts)
-        console.log(user)
-
         
     } catch (err) {
         console.log(err)

@@ -12,7 +12,6 @@ const UserSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true
     },
     description: {
         type: String
@@ -49,7 +48,23 @@ const UserSchema = new mongoose.Schema({
                 ref:'user'
             }
         }
-    ]
+    ],
+    followUpRequests: [
+        {
+            createdAt: {
+                type: Date,
+                default: Date.now
+            },
+            follower_id: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'user'
+            }
+        }
+    ],
+    private: {
+        type: Boolean,
+        default: false
+    }
 })
 
 module.exports = User = mongoose.model('user', UserSchema)

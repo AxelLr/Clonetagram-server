@@ -5,7 +5,59 @@ const {check, validationResult } = require('express-validator')
 const User = require('../../../models/User')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+// PASSPORT
+const passport = require('passport')
+const FacebookStrategy = require('passport-facebook').Strategy
+// FACEBOOK
 
+passport.use(new FacebookStrategy({
+    clientID: process.env.FACEBOOK_CLIENT_ID,
+    clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+    callbackURL:'http://localhost:5000/api/user/asdf',
+    profileFields: ['emails', 'displayName', 'profileUrl', 'picture.type(large)']
+},
+async function(accessToken, refreshToken, profile, done) {
+
+    let user = await User.findOne( { email: profile.emails[0].value } )
+
+    if(!user) {
+
+        let user = new User({
+            username: profile.displayName,
+            email: profile.emails[0].value,
+            profileImg: profile.photos[0].value
+        })
+
+        await user.save()
+
+        let payload = {
+            user: {
+                id: user._id
+            }
+        }
+        
+        jwt.sign(payload, process.env.jwtSecret, { expiresIn: 360000 }, (err, token) => {
+            done(null, token)
+        })
+    } else {
+        
+    let payload = {
+        user: {
+            id: user._id
+        }
+    }
+
+    jwt.sign(payload, process.env.jwtSecret, { expiresIn: 360000 }, (err, token) => {
+        done(null, token)
+    })
+
+    }
+
+}))
+// PASSPORT BOILERPLATE
+router.use(passport.initialize())
+passport.serializeUser((user, done) => done(null, user))
+passport.deserializeUser((id, done) => done(null, user))
 // REGISTER USER
 router.post('/register', [
     check('username', 'el número máximo de caracteres permitido es 15').isLength({max: 15}),
@@ -103,9 +155,7 @@ router.post('/login', [
             }
         }
 
-        jwt.sign(payload, process.env.jwtSecret, { expiresIn: 360000}, (err, token) => {
-            
-        if(err) throw err
+        jwt.sign(payload, process.env.jwtSecret, { expiresIn: 360000 }, (err, token) => {
 
         res.json( { token } )
     })}
@@ -116,6 +166,16 @@ router.post('/login', [
     }
 })
 
+ // FACEBOOK REGISTER/LOGIN STRATEGY 
+ router.get('/asd',
+  passport.authenticate('facebook')
+);
+
+router.get('/asdf',
+  passport.authenticate('facebook'), (req, res) => {
+    let token = req.user
+    res.redirect(`http://localhost:3000/#/redirecting/${token}`)
+  })
 
 
 module.exports = router

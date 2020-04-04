@@ -3,7 +3,7 @@ const router = express.Router()
 const User = require('../../../models/User')
 const Post = require('../../../models/Post')
 const Auth = require('../auth_middleware/Auth')
-const cloudinary = require('../../../Cloudinary')
+const cloudinary = require('../../../config/CloudinaryConfig')
 const fs = require('fs-extra')
 const {check, validationResult } = require('express-validator')
 
@@ -58,7 +58,6 @@ router.post('/me/details', Auth, [
 ], async (req, res) => {
 
     const errors = validationResult(req)
-
 
     try {
         
@@ -115,8 +114,23 @@ try {
     const followed = await User.findById(id)
 
     if(req.user.id === id) return res.status(400).json('No puedes hacer eso')
-    
-    
+
+    if(followed.private) { 
+        let checkRequest = followed.followUpRequests.find(elm => elm.follower_id == req.user.id)
+
+        if(checkRequest) return res.status(400).send('Ya enviaste una solicitud previamente.')
+
+        let newRequest = {
+            follower_id: req.user.id
+        }
+
+        followed.followUpRequests.unshift(newRequest)
+
+        await followed.save()
+        
+        return res.status(200).send(followed)
+    }
+      
     if(!followed) return res.status(400).json('El usuario no existe')
 
     let newFollower = {
@@ -129,7 +143,7 @@ try {
         user_id: followed.id
     }
 
-    const verifySubscription = followed.followers.find(user => user.user_id.toString() === req.user.id)
+    const verifySubscription = followed.followers.find(user => user.user_id == req.user.id)
 
     if(verifySubscription) return res.status(401).json('Ya sigues a esta cuenta')
 
@@ -212,55 +226,32 @@ try {
 
 })
 
+// CHANGE PRIVATE STATUS 
+router.patch('/privacy', Auth, async (req, res) => {
+    try {
+
+        const user = await User.findById(req.user.id)
+       
+        if(user.private) { 
+            await user.updateOne({ private: false }) 
+            await user.save()
+            return res.status(200).json('SuccessFull')
+        } else { 
+            await user.updateOne({ private: true })
+            await user.save()
+            return res.status(200).json('SuccessFull')
+         } 
+        
+    } catch (error) {
+        console.log(error)
+        return res.status(500).send('Server error')    
+    }
+})
+
 // HELPERS
 function escapeRegex(text) {
-    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-};
-
-
-// // DELETE ACCOUNT 
-// router.delete('/me/delete', Auth, async (req, res) => {
-
-// try {
-
-//     const user = await User.findById(req.user.id)
-//     const posts = await Post.find({ user_id: req.user.id })
-//     const comments = await Comment.find({user_id: req.user.id})
-
-    
-//     if(!user) return res.status(400).json('El usuario no existe')
-
-//     if(posts) await Post.remove({user_id: req.user.id})
-
-//     posts.forEach(post => {
-        
-//         if(post.likes.user.user_id.toString() === req.user.id) {
-
-//         let filteredLikesList = post.likes.filter(like => like.user !== req.user.id )
-            
-//         }
-//     })
-
-//     if (likedPosts) likedPosts.forEach(post => {
-
-        
-
-//         post.likes = filteredLikesList
-//     }) 
-
-//     if(comments) await Comment.remove({user_id: req.user.id})
-
-//     await User.deleteOne(req.user.id)
-
-//     res.json('User successfully deleted')
-    
-// } catch (err) {
-//     console.log(err)
-//     return res.status(500).send('Server error')       
-// }
-
-    
-// })
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
+}
 
 router.get('/', Auth, async (req, res) => {
 
@@ -271,6 +262,30 @@ router.get('/', Auth, async (req, res) => {
 
     } catch(err) {
         console.error(err.message)
+        return res.status(500).send('Server error')
+    }
+})
+
+// CANCEl SUBSCRIPTION REQUEST
+router.delete('/requests/:userid', Auth, async (req, res) => {
+    try {
+
+         const user = await User.findById(req.params.userid)
+
+         let checkRequest = user.followUpRequests.find(elm => elm.follower_id == req.user.id)
+    
+         if(!checkRequest) return res.status(400).send('Envía la solicitud primero.')
+
+         const newRequestList = user.followUpRequests.filter(request => request.follower_id.toString() !== req.user.id)
+
+         user.followUpRequests = newRequestList
+        
+         await user.save()
+
+         res.send(user)
+              
+    } catch (error) {
+        console.error(error.message)
         return res.status(500).send('Server error')
     }
 })
