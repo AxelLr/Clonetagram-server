@@ -1,33 +1,23 @@
-const express = require('express')
-const router = express.Router()
-const User = require('../../../models/User')
-const Post = require('../../../models/Post')
-const Comment = require('../../../models/Comment')
-const Auth = require('../../Routes/auth_middleware/Auth')
+// MODELS
+const User = require('../../models/User')
+const Post = require('../../models/Post')
+const Comment = require('../../models/Comment')
 
-// NEW COMMENT 
-router.post('/:id', Auth, async (req, res) => {
-
-    const { content } = req.body
-    const { id } = req.params
-
+exports.newComment = async (req, res) => {
     try {
-   
-        if(content.trim() === '') return res.status(400).json('No debe estar vacío')
-
-        let post = await Post.findByIdAndUpdate(id, { $inc: {'commentCount' : 1}})
+        let post = await Post.findByIdAndUpdate(req.params.id, { $inc: {'commentCount' : 1}})
 
         if(!post) return res.status(400).json('El post no existe')
         
         const newComment = new Comment ({
-            content,
+            content: req.body.content,
             user_id: req.user.id,
-            post_id: id
+            post_id: req.params.id
         }) 
 
         await newComment.save()
 
-        let comments = await Comment.find({'post_id': id }).populate('user_id', ['username', 'profileImg']).sort({date: -1})
+        let comments = await Comment.find({'post_id': req.params.id }).populate('user_id', ['username', 'profileImg']).sort({date: -1})
 
         res.json(comments)
         
@@ -35,10 +25,9 @@ router.post('/:id', Auth, async (req, res) => {
         console.log(err)
         return res.status(500).send('Server error')
     }
-})
+}
 
-// DELETE COMMENT 
-router.delete('/:id/delete', Auth, async (req, res) => {
+exports.deleteComment = async (req, res) => {
 
     const { id } = req.params
 
@@ -58,12 +47,10 @@ router.delete('/:id/delete', Auth, async (req, res) => {
     } catch (err) {
         console.log(err)
         return res.status(500).send('Server error')
-        
     }
-})
+}
 
-// GET COMMENTS FROM A POST 
-router.get('/:id', async ( req, res ) => {
+exports.getPostComments =  async ( req, res ) => {
 
     const { id } = req.params
     
@@ -81,41 +68,34 @@ router.get('/:id', async ( req, res ) => {
         console.log(err)
         return res.status(500).send('Server error')
     }
-})  
+}
 
-// ANSWER A COMMENT
-router.post('/:id/reply', Auth, async (req, res) => {
-
-    const { id } = req.params
-    const { content } = req.body
-
+exports.replyComment = async (req, res) => {
     try {
-
-       const comment = await Comment.findById(id).populate('user_id', ['username', 'profileImg'])
+       const comment = await Comment.findById(req.params.id).populate('user_id', ['username', 'profileImg'])
        const user = await User.findById(req.user.id)
         
        if(!comment) return res.status(401).json('El comentario no existe')
        
-      let newComment = {
+       let newComment = {
           username: user.username,
-          content,
+          content: req.body.content,
           user_id: req.user.id
        }
 
-        comment.replys.push(newComment)
+       comment.replys.push(newComment)
 
-        await comment.save()
+       await comment.save()
 
-        res.json(comment)
+       res.json(comment)
 
     } catch (err) {
         console.log(err)
         return res.status(500).send('Server error')
     }
-})
+}
 
-// DELETE COMMENT ANSWER 
-router.delete('/:commentid/reply/:replyid/delete', Auth, async (req, res) => {
+exports.deleteReply = async (req, res) => {
 
     const { commentid, replyid } = req.params
 
@@ -129,7 +109,6 @@ router.delete('/:commentid/reply/:replyid/delete', Auth, async (req, res) => {
 
         if(req.user.id !== reply.user_id.toString()) return res.status(401).json('No tienes autorización para hacer eso.')
 
-
         const newReplys = comment.replys.filter(reply => reply.id.toString() !== replyid)
 
         comment.replys = newReplys 
@@ -142,6 +121,4 @@ router.delete('/:commentid/reply/:replyid/delete', Auth, async (req, res) => {
         console.log(err)
         return res.status(500).send('Server error')
     }
-})
-
-module.exports = router
+}

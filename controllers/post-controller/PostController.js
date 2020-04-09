@@ -1,19 +1,11 @@
-const express = require('express')
-const router = express.Router()
-const { check, validationResult } = require('express-validator')
-const Auth = require('../auth_middleware/Auth')
-const Post = require('../../../models/Post')
-const User = require('../../../models/User')
-const cloudinary = require('../../../config/CloudinaryConfig')
+const cloudinary = require('../../config/CloudinaryConfig')
 const fs = require('fs-extra')
+const unAuthorized = require('./Helpers')
+// MODELS
+const Post = require('../../models/Post')
+const User = require('../../models/User')
 
-function unAuthorized(user, userRequesting) {
-    let unauthorized = user._id == userRequesting || !user.private ? false : user.private && !user.followers.some(foll => foll.user_id == userRequesting) && true
-    return { unauthorized }
-}
-
-// GET ALL POSTS 
-router.get('/', async (req, res) => {
+exports.getAllPosts = async (req, res) => {
 
     try {
          let allPosts = {}
@@ -30,11 +22,9 @@ router.get('/', async (req, res) => {
         console.error(err.message)
         return res.status(500).send('Server error')
     }
-})
+}
 
-// GET ALL POSTS FROM USER
-router.get('/users/:id', Auth, async (req, res) => {
-
+exports.getPostsFromUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
         const posts = await Post.find({'userRef': req.params.id}).populate('userRef', ['profileImg', 'username'])
@@ -49,52 +39,41 @@ router.get('/users/:id', Auth, async (req, res) => {
         console.error(err.message)
         return res.status(500).send('Server error')
     }
-})
-
-// NEW POST
-router.post('/add', Auth, [
-    check('description', 'el número máximo de caracteres permitido es 200').isLength({ max: 200 })
-], async (req, res) => {
-
-try{
-
-    if(req.validationErrors) return res.status(400).json(req.validationErrors) 
-    
-    const errors = validationResult(req)
-
-    const { description } = req.body
-
-    if(!errors.isEmpty()) {
-        return res.status(400).json( { errors: errors.array() } )
-    } 
-    const result = await cloudinary.v2.uploader.upload(req.file.path)
-    
-    let post = {
-        userRef: req.user.id,
-        public_id: result.public_id,
-        imageURL: result.secure_url
-    }
-
-    if(description) post.description = description
-
-    let newPost = new Post(post)
-
-    await newPost.save()
-    await fs.unlink(req.file.path)
-
-    post = await Post.findById(newPost._id).populate('userRef', ['username','profileImg'])
-
-    res.json(post)  
 }
+
+exports.addPost = async (req, res) => {
+    try{    
+        
+        const { description } = req.body
+
+        if(!req.file) return res.status(422).json({error: 'Campo imágen requerido.'})
+    
+        const result = await cloudinary.v2.uploader.upload(req.file.path)
+        
+        let post = {
+            userRef: req.user.id,
+            public_id: result.public_id,
+            imageURL: result.secure_url
+        }
+    
+        if(description) post.description = description
+    
+        let newPost = new Post(post)
+    
+        await newPost.save()
+        await fs.unlink(req.file.path)
+    
+        post = await Post.findById(newPost._id).populate('userRef', ['username','profileImg'])
+    
+        res.json(post)  
+    }
     catch(err) {
         console.log(err)
         return res.status(500).json('Server error')
     }
+}
 
-})
-
-// DELETE POST 
-router.delete('/:id/delete', Auth,  async (req, res) => {
+exports.deletePost = async (req, res) => {
 
     const { id } = req.params
     const post = await Post.findById(id)
@@ -116,35 +95,32 @@ router.delete('/:id/delete', Auth,  async (req, res) => {
         console.log(err)
         return res.status(500).json('Server error')
     }
-
-})
-
-// GET SINGLE POST
-router.get('/post/:id', Auth, async (req, res) => {
-
-try {
-    const post = await Post.findById(req.params.id).populate('userRef', ['username','profileImg'])
-    const user = await User.findById(post.userRef._id)
-    
-    if(!post) return res.status(400).json('El post no existe')
-    
-    let { unauthorized } = unAuthorized(user, req.user.id) 
-
-    if(unauthorized) { return res.status(401).send('No tienes autorizacion para ver este contenido') } else {
-        return res.json(post)
-    }     
-
-} catch(err) {
-    console.error(err.message)
-    if (err.kind == 'ObjectId') {
-        return res.status(400).json({msg: 'El post no existe'})
-    }
-    res.status(500).send('Internal server error')
 }
-})
 
-// LIKE A POST
-router.post('/:postid/like', Auth, async (req, res) => {
+exports.getSinglePost = async (req, res) => {
+
+    try {
+        const post = await Post.findById(req.params.id).populate('userRef', ['username','profileImg'])
+        const user = await User.findById(post.userRef._id)
+        
+        if(!post) return res.status(400).json('El post no existe')
+        
+        let { unauthorized } = unAuthorized(user, req.user.id) 
+    
+        if(unauthorized) { return res.status(401).send('No tienes autorizacion para ver este contenido') } else {
+            return res.json(post)
+        }     
+    
+    } catch(err) {
+        console.error(err.message)
+        if (err.kind == 'ObjectId') {
+            return res.status(400).json({msg: 'El post no existe'})
+        }
+        res.status(500).send('Internal server error')
+    }
+}
+
+exports.likeAPost = async (req, res) => {
     
     try {
 
@@ -168,10 +144,9 @@ router.post('/:postid/like', Auth, async (req, res) => {
         }
         res.status(500).send('Internal server error')
     }
-})
+}
 
-// DISLIKE A POST 
-router.delete('/:postid/dislike', Auth, async (req, res) => {
+exports.dislikeAPost =  async (req, res) => {
 
     const { postid } = req.params
 
@@ -199,10 +174,9 @@ router.delete('/:postid/dislike', Auth, async (req, res) => {
         }
         res.status(500).send('Internal server error')
     }
-})
+}
 
-// GET POSTS FROM SUBSCRIPTIONS 
-router.get('/user/subscriptions', Auth, async (req, res) => {
+exports.getPostsFromSubscriptions = async (req, res) => {
 
     try {
 
@@ -221,6 +195,4 @@ router.get('/user/subscriptions', Auth, async (req, res) => {
         return res.status(500).json('Server error')        
     }
 
-})
-
-module.exports = router
+}
