@@ -2,6 +2,7 @@
 const User = require('../../models/User')
 const Post = require('../../models/Post')
 const Comment = require('../../models/Comment')
+const { createNotification } = require('../../models/Notification')
 
 exports.newComment = async (req, res) => {
     try {
@@ -16,11 +17,13 @@ exports.newComment = async (req, res) => {
         }) 
 
         await newComment.save()
-
-        let comments = await Comment.find({'post_id': req.params.id }).populate('user_id', ['username', 'profileImg']).sort({date: -1})
-
-        res.json(comments)
         
+        let comment = await Comment.findOne(newComment._id).populate('user_id', ['username', 'profileImg'])
+     
+        res.json(comment)
+  
+        createNotification(req.user.id, comment.user_id.username, comment.user_id.profileImg, post.userRef ,'comment', req.params.id)
+
     } catch (err) {
         console.log(err)
         return res.status(500).send('Server error')
@@ -28,21 +31,17 @@ exports.newComment = async (req, res) => {
 }
 
 exports.deleteComment = async (req, res) => {
-
-    const { id } = req.params
-
     try {
+        const comment = await Comment.findById(req.params.id)
 
-    const comment = await Comment.findById(id)
+        await Post.findByIdAndUpdate(comment.post_id, { $inc: {'commentCount' : -1}})
+            
+        if(req.user.id !== comment.user_id.toString()) return res.status(401).json('No tienes autorización para hacer eso')
+        if(!comment) return res.status(400).json('El comentario no existe')
 
-    await Post.findByIdAndUpdate(comment.post_id, { $inc: {'commentCount' : -1}})
+        await Comment.deleteOne({_id: req.params.id})
         
-    if(req.user.id !== comment.user_id.toString()) return res.status(401).json('No tienes autorización para hacer eso')
-    if(!comment) return res.status(400).json('El comentario no existe')
-
-    await Comment.deleteOne({_id: id})
-    
-    res.send('Comment successfully deleted')
+        return res.status(200).send('Comment successfully deleted')
         
     } catch (err) {
         console.log(err)
@@ -50,13 +49,14 @@ exports.deleteComment = async (req, res) => {
     }
 }
 
-exports.getPostComments =  async ( req, res ) => {
-
-    const { id } = req.params
-    
+exports.getPostComments =  async ( req, res ) => {    
     try {
-        const comments = await Comment.find({post_id: id}).populate('user_id', ['username', 'profileImg']).sort({date: -1})
-        const post = await Post.findById(id)
+        const comments = await Comment.find({post_id: req.params.id})
+        .populate([{path: 'user_id', select: ['username', 'profileImg']},
+         { path: 'replies.user_id', select: ['username', 'profileImg'] }
+        ]).sort({date: 1})
+
+        const post = await Post.findById(req.params.id)
         
         if(!post) return res.status(401).json('El post no existe')
 
@@ -72,22 +72,24 @@ exports.getPostComments =  async ( req, res ) => {
 
 exports.replyComment = async (req, res) => {
     try {
-       const comment = await Comment.findById(req.params.id).populate('user_id', ['username', 'profileImg'])
+
+        console.log(req.body)
+
+        let newComment = {
+            content: req.body.content,
+            user_id: req.user.id
+         }
+
+       const comment = await Comment.findByIdAndUpdate(req.params.id, { $push : {'replies' : newComment }},
+        {new: true}).populate([{path: 'user_id', select: ['username', 'profileImg']}, { path: 'replies.user_id', select: ['username', 'profileImg']}])
+    
        const user = await User.findById(req.user.id)
         
        if(!comment) return res.status(401).json('El comentario no existe')
-       
-       let newComment = {
-          username: user.username,
-          content: req.body.content,
-          user_id: req.user.id
-       }
 
-       comment.replys.push(newComment)
+        res.json(comment)
 
-       await comment.save()
-
-       res.json(comment)
+        createNotification(req.user.id, comment.user_id.username, user.profileImg, comment.user_id._id, 'reply', comment.post_id)
 
     } catch (err) {
         console.log(err)
@@ -101,7 +103,7 @@ exports.deleteReply = async (req, res) => {
 
     try {
         const comment = await Comment.findById(commentid)
-        const reply = comment.replys.find(reply => reply._id.toString() === replyid)
+        const reply = comment.replies.find(reply => reply._id.toString() === replyid)
         
         if(!reply) return res.status(401).json('El comentario no existe')
 
@@ -109,9 +111,9 @@ exports.deleteReply = async (req, res) => {
 
         if(req.user.id !== reply.user_id.toString()) return res.status(401).json('No tienes autorización para hacer eso.')
 
-        const newReplys = comment.replys.filter(reply => reply.id.toString() !== replyid)
+        const newReplies = comment.replies.filter(reply => reply.id.toString() !== replyid)
 
-        comment.replys = newReplys 
+        comment.replies = newReplies 
 
         await comment.save()
 

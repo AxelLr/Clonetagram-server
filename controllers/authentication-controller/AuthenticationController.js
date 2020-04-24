@@ -168,10 +168,10 @@ exports.login = async (req, res) => {
        return res.status(500).send('internal server error')
     }
 }
-// FACEBOOK LOGIN CALLBACK
+// LOGIN CALLBACK
 exports.loginCallback = (req, res) => {
     let token = req.user
-    res.redirect(`http://localhost:3000/#/redirecting/${token}`)
+    res.redirect(`${process.env.REDIRECT_URL + token}`)
   }
 
 // E-MAIL CHECK
@@ -221,9 +221,9 @@ exports.forgotPassword = async (req, res) => {
             from: 'emailSender210@gmail.com',
             to: `${user.email}`,
             subject: 'Reestablecer contraseña',
-            text: `Recibiste este E-mail porque tu(o alguien) ha solicitado reestablecer la contraseña de tu cuenta.
+            text: `Recibiste este E-mail porque tu (o alguien) ha solicitado reestablecer la contraseña de tu cuenta.
             Por favor, clickea en el siguiente link o pegalo en el buscador de tu navegador para completar el proceso dentro de la siguiente hora despues de recibirlo.
-            http://localhost:3000/#/resetPassword/${token}. Si no solicitaste reestablecer la contraseña, simplemente ignora este mensaje.`
+            ${process.env.RESET_PASSWORD_URL + token}. Si no solicitaste reestablecer la contraseña, simplemente ignora este mensaje.`
         }
 
         transporter.sendMail(mailOptions, (err, data) => {

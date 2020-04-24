@@ -20,6 +20,6 @@ module.exports = {
             return cb(null, true)
         }
         req.validationErrors = 'El Archivo debe ser una imágen válida.'
-        return cb(null, false, req.fileValidationError)
+        return cb(null, false, req.validationErrors)
     }
 }

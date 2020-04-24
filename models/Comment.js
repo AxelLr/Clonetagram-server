@@ -18,12 +18,8 @@ const CommentSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    replys: [
+    replies: [
         {
-            username: {
-                type: String,
-                required: true
-            },
             content: {
                 type: String,
                 required: true
@@ -32,10 +28,10 @@ const CommentSchema = new mongoose.Schema({
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'user'
             },
-            date: {
+            createdAt: {
                 type: Date,
                 default: Date.now 
-            }           
+            }
         }
     ]
 })

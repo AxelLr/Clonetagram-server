@@ -1,18 +1,24 @@
 const cloudinary = require('../../config/CloudinaryConfig')
 const fs = require('fs-extra')
 const escapeRegex = require('./Helpers')
+const { createNotification } = require('../../models/Notification')
 // MODELS
 const User = require('../../models/User')
 
 exports.getLoggedUserData = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id)
+        const user = await User.findById(req.user.id).select(['-password'])
+        .populate([
+            {path: 'followers.user_id', select: ['profileImg', 'username']},
+            {path: 'subscriptions.user_id', select: ['profileImg', 'username']},
+            {path: 'followUpRequests.follower_id', select: ['profileImg', 'username']}
+        ])
      
         if(!user) {
             return res.status(401).send('El usuario no existe ')
         }
-
-        res.json(user)
+        
+        return res.status(200).json(user)
         
     } catch (err) {
         console.log(err)
@@ -22,10 +28,12 @@ exports.getLoggedUserData = async (req, res) => {
 
 exports.changeProfileImage = async (req, res) => {
     try {
+        if(req.validationErrors) return res.status(422).send(req.validationErrors)
+
         const result = await cloudinary.v2.uploader.upload(req.file.path)
         const user = await User.findById(req.user.id)
 
-        if(user.profileImg !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1580349494/noprofileimg2_d40pl3.png') {
+        if(user.public_id && user.profileImg !== 'https://res.cloudinary.com/dtyljkszk/image/upload/v1580349494/noprofileimg2_d40pl3.png') {
             await cloudinary.v2.uploader.destroy(user.public_id)
         }
 
@@ -37,7 +45,7 @@ exports.changeProfileImage = async (req, res) => {
         await user.save()
         await fs.unlink(req.file.path)
 
-        res.json(user)
+        return res.status(200).json({ id: user._id, profileImage: user.profileImg })
         
     } catch (err) {
         console.log(err)
@@ -47,9 +55,6 @@ exports.changeProfileImage = async (req, res) => {
 
 exports.addUserDescription = async (req, res) => {
     try {
-        
-        if(req.body.details.trim() === '') return res.status(400).json('No debe estar vacío')
-
         const user = await User.findById(req.user.id)
 
         if(!user) return res.status(400).json('El usuario no existe')
@@ -57,7 +62,8 @@ exports.addUserDescription = async (req, res) => {
         user.description = req.body.details
 
         await user.save()
-        res.json(user)
+
+        return res.status(200).json(user)
         
     } catch (err) {
         console.log(err)
@@ -66,75 +72,58 @@ exports.addUserDescription = async (req, res) => {
 }
 
 exports.getUserData = async (req, res) => {
-
-    const { id } = req.params
-    
-        try {
-    
-        const user = await User.findById(id)
-        // const posts = await Post.find({user_id: id})
-    
-        if(!user) {
-            return res.status(401).json('El usuario no existe')
-        }
-    
-        res.json(user)
-    
-        } catch (err) {
-            console.log(err)
-            return res.status(500).json('Server error')
-        }
+    try {
+        const user = await User.findById(req.params.id).select(['-password'])
+        .populate([
+            {path: 'followers.user_id', select: ['profileImg', 'username']},
+            {path: 'subscriptions.user_id', select: ['profileImg', 'username']},
+            {path: 'followUpRequests.follower_id', select: ['profileImg', 'username']}
+        ])
+        
+        if(!user) return res.status(401).json('El usuario no existe')
+            
+        return res.status(200).json(user)
+        
+    } catch (err) {
+        console.log(err)
+        return res.status(500).json('Server error')
+    }
 }
 
 exports.subscribe = async (req, res) => {
-
-    const { id } = req.params
-    
     try {
-        const follower = await User.findById(req.user.id)
-        const followed = await User.findById(id)
-    
-        if(req.user.id === id) return res.status(400).json('No puedes hacer eso')
+        const follower = await User.findById(req.user.id).select(['subscriptions', 'profileImg', 'username'])
+        const followed = await User.findById(req.params.id).select(['followers', 'followUpRequests', 'private'])
+ 
+        if(req.user.id === req.params.id) return res.status(400).send('No puedes hacer eso')
     
         if(followed.private) { 
+
             let checkRequest = followed.followUpRequests.find(elm => elm.follower_id == req.user.id)
     
             if(checkRequest) return res.status(400).send('Ya enviaste una solicitud previamente.')
     
-            let newRequest = {
-                follower_id: req.user.id
-            }
-    
-            followed.followUpRequests.unshift(newRequest)
-    
-            await followed.save()
+            await followed.updateOne({ $push: {'followUpRequests': { follower_id: req.user.id } }})
+
+            createNotification(follower._id, follower.username, follower.profileImg, followed._id, 'followRequest')
             
-            return res.status(200).send(followed)
+            return res.status(200).send('Successfully sended')
         }
-          
+         
         if(!followed) return res.status(400).json('El usuario no existe')
-    
-        let newFollower = {
-            username: follower.username,
-            user_id: follower.id
-        }
-    
-        let newSubscription = {
-            username: followed.username,
-            user_id: followed.id
-        }
-    
+
         const verifySubscription = followed.followers.find(user => user.user_id == req.user.id)
     
         if(verifySubscription) return res.status(401).json('Ya sigues a esta cuenta')
+
+        await follower.updateOne({ $push: {'subscriptions': { user_id: req.params.id } }})
+
+        await followed.updateOne({ $push: {'followers': { user_id: req.user.id } }})
+
+        createNotification(follower._id, follower.username, follower.profileImg, followed._id, 'follow')
+        
+        return res.status(200).send('Successfully followed')
     
-        followed.followers.push(newFollower)
-        await followed.save()
-    
-        follower.subscriptions.push(newSubscription)
-        await follower.save()
-    
-        res.send(followed)
     
     } catch (err) {
         console.log(err)
@@ -143,31 +132,20 @@ exports.subscribe = async (req, res) => {
 }
 
 exports.unsubscribe = async (req, res) => {
-
-    const { id } = req.params
-
     try {
-        const follower = await User.findById(req.user.id)
-        const followed = await User.findById(id)
+        const followed = await User.findById(req.params.id).select(['followers'])
         
         if(!followed) return res.status(400).json('El usuario no existe')
-
+        
         const verifySubscription = followed.followers.find(user => user.user_id.toString() === req.user.id)
 
-        if(!verifySubscription) return res.status(400).json('No sigues a esta cuenta.')
-    
-        const newFollowersList = followed.followers.filter(user => user.user_id.toString() !== req.user.id )
+        if(!verifySubscription) return res.status(400).send('No sigues a esta cuenta.')
 
-        followed.followers = newFollowersList
+        await followed.updateOne({ $pull: {'followers': { user_id: req.user.id } } })
 
-        await followed.save()
-
-        const newSubscriptionList = follower.subscriptions.filter(user => user.user_id.toString() !== id )
-
-        follower.subscriptions = newSubscriptionList
-        await follower.save()
-    
-        res.send(followed)
+        await User.findByIdAndUpdate(req.user.id, { $pull: {'subscriptions': { user_id: req.params.id } } })
+     
+        return res.status(200).send('successfull')
     
     } catch (err) {
         console.log(err)
@@ -177,14 +155,13 @@ exports.unsubscribe = async (req, res) => {
 
 exports.getUserSearch = async (req, res) =>{
     try {
-        console.log(req.query.search)
         if(req.query.search) {
     
         const regex = new RegExp(escapeRegex(req.query.search), 'gi')
     
-        const user = await User.find({'username': regex })
+        const user = await User.find({'username': regex }).select(['username', 'profileImg'])
     
-        if(!user) res.send(undefined)
+        if(!user) res.send(null)
      
         res.json(user)
    
@@ -192,7 +169,7 @@ exports.getUserSearch = async (req, res) =>{
     
         const users = await User.find().limit(5)
     
-        users && res.json(users)
+        if(users) return res.status(200).json(users)
         }    
 
     } catch (err) {
@@ -214,7 +191,7 @@ exports.changePrivacy = async (req, res) => {
             await user.updateOne({ private: true })
             await user.save()
             return res.status(200).json('SuccessFull')
-         } 
+        } 
         
     } catch (error) {
         console.log(error)
@@ -222,9 +199,8 @@ exports.changePrivacy = async (req, res) => {
     }
 }
 
-exports.cancelSubscriptionRequest =  async (req, res) => {
+exports.cancelSubscriptionRequest = async (req, res) => {
     try {
-
          const user = await User.findById(req.params.userid)
 
          let checkRequest = user.followUpRequests.find(elm => elm.follower_id == req.user.id)
@@ -237,10 +213,63 @@ exports.cancelSubscriptionRequest =  async (req, res) => {
         
          await user.save()
 
-         res.send(user)
-              
+         return res.status(200).json(user)
+
     } catch (error) {
         console.error(error.message)
         return res.status(500).send('Server error')
     }
 }
+
+exports.ignoreRequest = async (req, res) => {
+    try {
+
+       const user = await User.findById(req.user.id).select('followUpRequests')
+
+       const checkRequest = user.followUpRequests.find(request => request.follower_id.toString() === req.params.follower_id)
+
+       if(!checkRequest) return res.status(400).send('La solicitud no existe')
+
+       const newRequestList = user.followUpRequests.filter(request => request.follower_id.toString() !== req.params.follower_id)
+       
+       user.followUpRequests = newRequestList
+
+       await user.save()
+
+       return res.status(200).send('Ignored')
+        
+    } catch (error) {
+        console.log(error)
+        return res.status(500).send('Server error')
+    }
+}
+
+ exports.acceptRequest = async (req, res) => {
+     try {
+
+        console.log(req.body)
+
+        const user = await User.findById(req.user.id).select(['followUpRequests', 'followers'])
+
+        const checkRequest = user.followUpRequests.find(request => request.follower_id.toString() === req.body.follower_id)
+
+        if(!checkRequest) return res.status(400).send('La solicitud no existe') 
+
+        const newRequestList = user.followUpRequests.filter(request => request.follower_id.toString() !== req.body.follower_id)
+       
+        user.followUpRequests = newRequestList
+
+        user.followers.unshift({user_id: req.body.follower_id })
+ 
+        await user.save()
+
+        // USUARIO QUE MANDA LA SOLICITUD
+        await User.findByIdAndUpdate( req.body.follower_id, { $push: { 'subscriptions': { user_id: req.user.id } } })
+    
+        return res.status(200).send('Success')
+          
+     } catch (error) {
+         console.log(error)
+         return res.status(500).send('Server error')
+     }
+ }

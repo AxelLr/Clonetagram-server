@@ -10,7 +10,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true
-    },
+    }, 
     password: {
         type: String,
     },
@@ -30,23 +30,25 @@ const UserSchema = new mongoose.Schema({
     },
     followers: [
         {
-            username: {
-                type: String,
-            },
             user_id: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref:'user'
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now
             }
         }
     ],
     subscriptions: [
         {
-            username: {
-                type: String,
-            },
             user_id: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref:'user'
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now
             }
         }
     ],

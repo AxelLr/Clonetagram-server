@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const io = require('../index').io
 
 const NotificationSchema = new mongoose.Schema({
     createdAt: {
@@ -10,6 +11,12 @@ const NotificationSchema = new mongoose.Schema({
         ref: 'user',
         required: true
     },
+    senderName: {
+        type: String
+    },
+    senderAvatar: {
+        type: String
+    },
     receiver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
@@ -19,15 +26,9 @@ const NotificationSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    commentRef: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'comment',
-        required: true
-    },
     postRef: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'post',
-        required: true
+        ref: 'post'
     },
     readed: {
         type: Boolean,
@@ -35,4 +36,29 @@ const NotificationSchema = new mongoose.Schema({
     }
 })
 
-module.exports = Notification = mongoose.model('notification', NotificationSchema)
+const Notification = exports.Notification = mongoose.model('notification', NotificationSchema)
+
+ exports.createNotification = async (sender, senderName, senderAvatar, receiver, type, postRef) => {  
+    try {
+        if(sender == receiver) return;
+
+         const notification = new Notification({
+            sender,
+            senderName,
+            receiver,
+            type,
+            postRef,
+            senderAvatar
+         })
+         
+        await notification.save()
+
+        console.log('working')
+
+        return io.to(`${receiver}`).emit('NEW_NOTIFICATION', notification)
+           
+    } catch (error) {
+        console.log(error)
+    }
+ }
+

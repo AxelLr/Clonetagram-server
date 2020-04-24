@@ -1,4 +1,4 @@
-const Notification = require('../../models/Notification')
+const { Notification } = require('../../models/Notification')
 
 exports.getUserNotifications = async (req, res) => {
     try {
@@ -7,17 +7,20 @@ exports.getUserNotifications = async (req, res) => {
         res.send(notification)
         
     } catch (error) {
-        console.log(err)
+        console.log(error)
         return res.status(500).send('Server error')    
     }
 }
 
 exports.markNotificationsAsReaded = async (req, res) => {
     try {
-        console.log('IT FKING WORKS')
-        
+         await Notification.updateMany({receiver: req.user.id}, {$set : { readed: true } })
+    
+
+        return res.status(200).send('Successfully updated')
+
     } catch (error) {
-        console.log(err)
+        console.log(error)
         return res.status(500).send('Server error')  
     }
 }

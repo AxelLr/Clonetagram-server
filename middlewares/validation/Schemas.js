@@ -9,7 +9,7 @@ const email = Joi.string()
 
 const password = Joi.string().trim()
 .regex(/^[\w@#$%]+$/)
-.min(3)
+.min(6)
 .max(18)
 .required()
 .messages({
@@ -32,10 +32,12 @@ const username = Joi.string()
     'string.pattern.base': 'El nombre contiene espacios o caracteres inválidos'
 })
 
-const description = Joi.string().max(255).messages({
-    'string.max': 'Descripción demasiado larga'
-})
-
+const description = Joi.object().keys({
+    description: Joi.string().allow('').max(255).messages({
+        'string.max': 'Descripción demasiado larga'
+    })
+    
+}) 
 const registerSchema = Joi.object().keys({
     email,
     password,

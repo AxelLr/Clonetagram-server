@@ -6,8 +6,8 @@ const validation = require('../../middlewares/validation/Validation')
 // VALIDATION SCHEMAS
 const { comment } = require('../../middlewares/validation/Schemas')
 // CONTROLLERS
-const { newComment, deleteComment, getPostComments, replyComment, deleteReply} = require('../../controllers/comment-controller/CommentController')
-// NEW COMMENT 
+const { newComment, deleteComment, getPostComments, replyComment, deleteReply } = require('../../controllers/comment-controller/CommentController')
+// NEW COMMENT  
 router.post('/:id', Auth, validation(comment), newComment)
 // DELETE COMMENT 
 router.delete('/:id/delete', Auth, deleteComment)

@@ -10,7 +10,9 @@ const { getLoggedUserData,
         unsubscribe,
         getUserSearch,
         changePrivacy,
-        cancelSubscriptionRequest
+        cancelSubscriptionRequest,
+        ignoreRequest,
+        acceptRequest
      } = require('../../controllers/user-controller/UserController')
 // GET LOGGED IN USER DATA 
 router.get('/me', Auth, getLoggedUserData )
@@ -29,6 +31,10 @@ router.get('/', Auth, getUserSearch)
 // CHANGE PRIVATE STATUS 
 router.patch('/privacy', Auth, changePrivacy)
 // CANCEl SUBSCRIPTION REQUEST
-router.delete('/requests/:userid', Auth, cancelSubscriptionRequest)
+router.delete('/requests/cancel/:userid', Auth, cancelSubscriptionRequest)
+// IGNORE SUBSCRIPTION REQUEST 
+router.delete('/requests/ignore/:follower_id', Auth, ignoreRequest)
+// ACCEPT SUBSRIPTION REQUEST
+router.patch('/requests/accept', Auth, acceptRequest)
 
 module.exports = router

@@ -12,15 +12,15 @@ router.post('/register', validation(registerSchema), register)
 //LOGIN USER 
 router.post('/login', validation(loginSchema), login)
 // FACEBOOK REGISTER/LOGIN STRATEGY 
-router.get('/asd', facebookLoginMiddleware)
+router.get('/login/facebook', facebookLoginMiddleware)
 // FACEBOOK REGISTER/LOGIN CALLBACK
-router.get('/asdf', facebookLoginMiddleware, loginCallback)
+router.get('/login/facebook/callback', facebookLoginMiddleware, loginCallback)
 // GOOGLE LOGIN STRATEGY
-router.get('/asdfg', googleLoginMiddleware)
+router.get('/login/google', googleLoginMiddleware)
 // GOOGLE LOGIN CALLBACK
-router.get('/asdfgh', googleMiddlewareCallback, loginCallback)
+router.get('/login/google/callback', googleMiddlewareCallback, loginCallback)
 //CHECK E_MAIL
-router.post('/aaaa', emailCheck)
+router.post('/checkEmail', emailCheck)
 // FORGOT PASSWORD
 router.post('/forgotPassword', forgotPassword)
 // GET USER BY RESET TOKEN

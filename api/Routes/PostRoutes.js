@@ -13,7 +13,7 @@ router.get('/', getAllPosts)
 // GET ALL POSTS FROM USER
 router.get('/users/:id', Auth, getPostsFromUser)
 // ADD POST
-router.post('/add', Auth, validation(description), addPost)
+router.post('/add', Auth, addPost)
 // DELETE POST 
 router.delete('/:id/delete', Auth, deletePost )
 // GET SINGLE POST

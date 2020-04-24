@@ -4,6 +4,7 @@ const unAuthorized = require('./Helpers')
 // MODELS
 const Post = require('../../models/Post')
 const User = require('../../models/User')
+const { createNotification } = require('../../models/Notification')
 
 exports.getAllPosts = async (req, res) => {
 
@@ -46,7 +47,9 @@ exports.addPost = async (req, res) => {
         
         const { description } = req.body
 
-        if(!req.file) return res.status(422).json({error: 'Campo imágen requerido.'})
+        if(req.validationErrors) return res.status(422).send(req.validationErrors)
+
+        if(!req.file) return res.status(422).send('Campo imágen requerido.')
     
         const result = await cloudinary.v2.uploader.upload(req.file.path)
         
@@ -121,12 +124,11 @@ exports.getSinglePost = async (req, res) => {
 }
 
 exports.likeAPost = async (req, res) => {
-    
     try {
-
-        const post = await Post.findById( req.params.postid)
+        const post = await Post.findById( req.params.postid).populate('userRef', ['_id','username','profileImg'])
         const like = post.likes.filter(like => like.user.toString() === req.user.id)
-
+        const user = await User.findById(req.user.id)
+    
         if(!post) return res.status(401).json('El post no existe')
         
         if(like.length >= 1) return res.status(400).json('Ya le diste me gusta a este post')
@@ -136,6 +138,8 @@ exports.likeAPost = async (req, res) => {
         await post.save()
 
         res.json(post)
+
+        createNotification(req.user.id, user.username, user.profileImg, post.userRef._id, 'like', post._id)
         
     } catch(err) {
         console.error(err.message)
